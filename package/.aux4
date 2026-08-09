@@ -1,0 +1,212 @@
+{
+  "scope": "aux4",
+  "name": "profile",
+  "version": "0.0.1",
+  "description": "Named profiles, each a fully self-contained package set. aux4 loads a subset of installed packages by swapping which profile is active.",
+  "license": "MIT",
+  "tags": [
+    "profile",
+    "packages",
+    "workspace",
+    "environment"
+  ],
+  "system": [
+    [
+      "test:node --version",
+      "brew:node",
+      "linux:nodejs"
+    ]
+  ],
+  "profiles": [
+    {
+      "name": "main",
+      "commands": [
+        {
+          "name": "profile",
+          "execute": [
+            "profile:profile"
+          ],
+          "help": {
+            "text": "Manage named profiles, each a self-contained set of installed packages"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "commands": [
+        {
+          "name": "init",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs init"
+          ],
+          "help": {
+            "text": "Migrate the flat config into profiles/default and lay the two symlinks (also happens lazily on first use)"
+          }
+        },
+        {
+          "name": "list",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs list"
+          ],
+          "help": {
+            "text": "List all profiles and mark the active one with *"
+          }
+        },
+        {
+          "name": "show",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs show value(name)"
+          ],
+          "help": {
+            "text": "Show the packages a profile contains (defaults to the active profile)",
+            "variables": [
+              {
+                "name": "name",
+                "text": "Profile to show; defaults to the active profile",
+                "arg": true,
+                "default": ""
+              }
+            ]
+          }
+        },
+        {
+          "name": "create",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs create value(name) --from value(from)"
+          ],
+          "help": {
+            "text": "Create a new profile — minimal (essentials only) by default, or a full clone with --from",
+            "variables": [
+              {
+                "name": "name",
+                "text": "Name of the new profile",
+                "arg": true
+              },
+              {
+                "name": "from",
+                "text": "Source profile to fully clone; omit for a minimal (essentials-only) profile",
+                "default": ""
+              }
+            ]
+          }
+        },
+        {
+          "name": "use",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs use value(name)"
+          ],
+          "help": {
+            "text": "Switch the active profile by repointing both symlinks (restart the daemon to apply)",
+            "variables": [
+              {
+                "name": "name",
+                "text": "Profile to activate",
+                "arg": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "add",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs add value(package)"
+          ],
+          "help": {
+            "text": "Bring an already-installed package (present in another profile) into the active profile without reinstalling",
+            "variables": [
+              {
+                "name": "package",
+                "text": "Package id as scope/name (version is ignored)",
+                "arg": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "remove",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs remove value(package)"
+          ],
+          "help": {
+            "text": "Remove a package from the active profile (refuses the essentials; the package stays in other profiles)",
+            "variables": [
+              {
+                "name": "package",
+                "text": "Package id as scope/name (version is ignored)",
+                "arg": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "delete",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs delete value(name)"
+          ],
+          "help": {
+            "text": "Delete a profile and its store (refuses the default profile and the active profile)",
+            "variables": [
+              {
+                "name": "name",
+                "text": "Profile to delete",
+                "arg": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "sync",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs sync value(package) values(to*)"
+          ],
+          "help": {
+            "text": "Propagate an already-referenced package from the active profile into other profiles (add reference only; no reinstall)",
+            "variables": [
+              {
+                "name": "package",
+                "text": "Package id as scope/name (version is ignored)",
+                "arg": true
+              },
+              {
+                "name": "to",
+                "text": "Target profile(s); repeatable, or --to all for every other profile",
+                "default": "all",
+                "multiple": true
+              }
+            ]
+          }
+        },
+        {
+          "name": "teardown",
+          "execute": [
+            "node ${packageDir}/lib/profile.mjs teardown"
+          ],
+          "help": {
+            "text": "Reverse the bootstrap — switch to default and collapse the symlinks back into a flat config (run before uninstalling aux4/profile)"
+          }
+        }
+      ]
+    }
+  ],
+  "hooks": [
+    {
+      "command": "aux4:pkger/install",
+      "before": [
+        "node --input-type=module -e \"import('${packageDir}/../profile/lib/profile.mjs').then(m=>m.hookInstallBefore()).catch(()=>{})\""
+      ]
+    },
+    {
+      "command": "aux4:pkger/install",
+      "after": [
+        "node --input-type=module -e \"import('${packageDir}/../profile/lib/profile.mjs').then(m=>m.hookInstallAfter(process.argv[1])).catch(()=>{})\" values(sync*)"
+      ]
+    },
+    {
+      "command": "aux4:pkger/uninstall",
+      "before": [
+        "node --input-type=module -e \"import('${packageDir}/../profile/lib/profile.mjs').then(m=>m.hookUninstallBefore(process.argv[1])).catch(()=>{})\" 'pkg=${package}'"
+      ]
+    }
+  ]
+}
