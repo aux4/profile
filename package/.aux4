@@ -1,7 +1,7 @@
 {
   "scope": "aux4",
   "name": "profile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Named profiles, each a fully self-contained package set. aux4 loads a subset of installed packages by swapping which profile is active.",
   "license": "MIT",
   "tags": [
