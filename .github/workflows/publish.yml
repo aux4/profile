@@ -1,32 +1,85 @@
-name: Publish
+name: Publish Package
 
 on:
   push:
     branches:
       - main
+    paths:
+      - '**'
+      - '!.github/**'
+      - '!README.md'
+      - '!LICENSE'
+      - '!.gitignore'
+
+  workflow_dispatch:
+    inputs:
+      level:
+        description: 'Release level (patch, minor, major)'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: publish-package
+  cancel-in-progress: false
+
+permissions:
+  contents: write
 
 jobs:
-  publish:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Lint
+        uses: aux4/action@v1
         with:
-          node-version: "20"
+          command: lint
+          strict: 'true'
 
-      - name: Install aux4
-        run: curl -s https://aux4.io/install | bash
+  test-linux:
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Run tests
-        run: |
-          cd package
-          aux4 test run
-
-      - name: Publish package
-        uses: aux4/publish-package-action@v1
+      - name: Test
+        uses: aux4/action@v1
         with:
-          directory: package
-          token: ${{ secrets.AUX4_ACCESS_TOKEN }}
+          command: test
+
+  test-darwin:
+    needs: [lint]
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Test
+        uses: aux4/action@v1
+        with:
+          command: test
+
+  publish:
+    needs: [lint, test-linux, test-darwin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Publish
+        uses: aux4/action@v1
+        with:
+          command: publish
+          level: ${{ inputs.level || 'patch' }}
+          aux4_token: ${{ secrets.AUX4_ACCESS_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
